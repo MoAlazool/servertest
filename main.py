@@ -173,6 +173,15 @@ def scrape_recipe(url: str):
             except (json.JSONDecodeError, TypeError):
                 continue
 
+        # Always extract body text as fallback
+        for tag in soup(["script", "style", "nav", "footer", "header"]):
+            tag.decompose()
+
+        body_text = soup.get_text(separator="\n", strip=True)
+        # Limit text length to avoid sending too much to AI
+        if len(body_text) > 8000:
+            body_text = body_text[:8000]
+
         if recipe_data:
             # Extract image from recipe data if not already found
             if not og_image and recipe_data.get("image"):
@@ -184,23 +193,16 @@ def scrape_recipe(url: str):
                 elif isinstance(img, dict):
                     og_image = img.get("url", "")
 
+            # Check if recipe data is incomplete (missing instructions)
+            has_instructions = recipe_data.get("recipeInstructions")
+
             return {
                 "success": True,
                 "recipe_data": recipe_data,
-                "page_text": None,
+                "page_text": body_text if not has_instructions else None,
                 "title": recipe_data.get("name") or page_title,
                 "image_url": og_image,
             }
-
-        # Fallback: extract body text
-        # Remove script and style elements
-        for tag in soup(["script", "style", "nav", "footer", "header"]):
-            tag.decompose()
-
-        body_text = soup.get_text(separator="\n", strip=True)
-        # Limit text length to avoid sending too much to AI
-        if len(body_text) > 8000:
-            body_text = body_text[:8000]
 
         return {
             "success": True,
